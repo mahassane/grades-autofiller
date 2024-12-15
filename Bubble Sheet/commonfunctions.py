@@ -1,6 +1,6 @@
 import pytesseract
 pytesseract.pytesseract.tesseract_cmd = "C:/Program Files/Tesseract-OCR/tesseract.exe"
-from cv2 import findContours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE, drawContours
+from cv2 import findContours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE, CHAIN_APPROX_NONE, drawContours
 from imutils import grab_contours, contours
 import skimage.io as io
 import matplotlib.pyplot as plt
@@ -17,9 +17,11 @@ import math
 from skimage.util import random_noise, invert
 from skimage.filters import median
 from skimage.feature import canny
+from cv2 import Canny
 from skimage.measure import label
 from skimage.color import label2rgb
-from skimage.morphology import dilation, square, disk
+from skimage.morphology import dilation, square, disk, opening
+from skimage.transform import hough_circle, hough_circle_peaks
 
 
 # Edges
