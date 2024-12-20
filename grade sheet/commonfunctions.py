@@ -18,7 +18,24 @@ from skimage.measure import label
 import cv2
 from skimage.color import label2rgb
 import os
+from functools import cmp_to_key
+from pathlib import Path
+from PIL import Image
 
+# Imports for classifying
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier  # MLP is a NN
+from sklearn import svm
+import numpy as np
+import argparse
+import imutils 
+import cv2
+import os
+import random
+
+
+# Depending on library versions on your system, one of the following imports 
+from sklearn.model_selection import train_test_split
 
 # Edges
 from skimage.filters import sobel_h, sobel, sobel_v,roberts, prewitt
@@ -50,131 +67,85 @@ def showHist(img):
     
     bar(imgHist[1].astype(np.uint8), imgHist[0], width=0.8, align='center')
 
-alpha = 1.0
-beta = 0.0
-# Function to perform the perspective transformation
-def perspective_transform(img,binary):
+"''''''''''''''''''''''''''''''''''''''''''''''''''''''''"
+# Enhanced Perspective Transformation
+def align_image_using_perspective(image, is_binary=False):
+    if image is None:
+        raise ValueError("Error: Image is None or not loaded.")
 
-    if img is None:
-        print(f"Error: Unable to load the image.")
+    if not is_binary:
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        _, binary_image = cv2.threshold(gray_image, 50, 255, cv2.THRESH_BINARY)
     else:
-        # Convert the image to grayscale
-        binary_image=0
-        if binary==0:
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        binary_image = image
 
-            # Apply thresholding to create a binary image
-            _, binary_image = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY)
-        else :
-            binary_image=img
-        # cf.show_images([binary_image])
-        # Find contours in the binary image
-        contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    largest_contour = max(contours, key=cv2.contourArea)
+    epsilon = 0.02 * cv2.arcLength(largest_contour, True)
+    polygon = cv2.approxPolyDP(largest_contour, epsilon, True)
 
-        # Find the largest contour based on area
-        print(len(contours))
-        largest_contour = max(contours, key=cv2.contourArea)
-        # Approximate the contour to a polygon
-        epsilon = 0.02 * cv2.arcLength(largest_contour, True)
-        approx_polygon = cv2.approxPolyDP(largest_contour, epsilon, True)
+    if len(polygon) != 4:
+        raise ValueError("Error: Could not find a quadrilateral.")
 
-        # Get the four corners of the polygon
-        corners = approx_polygon.reshape(-1, 2)
-        corners = sorted(corners, key=lambda x: x[1])
-        # Separate the sorted corners into top and bottom
-        top_corners = sorted(corners[:2], key=lambda x: x[0])
-        bottom_corners = sorted(corners[2:], key=lambda x: x[0])
+    corners = sorted(polygon.reshape(-1, 2), key=lambda x: x[1])
+    top_corners = sorted(corners[:2], key=lambda x: x[0])
+    bottom_corners = sorted(corners[2:], key=lambda x: x[0])
+    sorted_corners = np.concatenate([bottom_corners, top_corners])
 
-        # Concatenate the sorted corners
-        sorted_corners = np.concatenate([bottom_corners, top_corners])
+    height, width = image.shape[:2]
+    destination_points = np.float32([[0, height], [width, height], [0, 0], [width, 0]])
+    transform_matrix = cv2.getPerspectiveTransform(sorted_corners.astype(np.float32), destination_points)
+    aligned_image = cv2.warpPerspective(image, transform_matrix, (width, height))
+    return aligned_image
 
-        # Define the destination points for the perspective transformation
-        dst_points = np.float32([[0, img.shape[0]], [img.shape[1], img.shape[0]], [0, 0], [img.shape[1], 0]])
+# Enhanced Image Inversion
+def enhance_and_invert_image(image):
+    adjusted_image = cv2.addWeighted(image, 1.0, np.zeros(image.shape, image.dtype), 0, 0)
+    aligned_image = align_image_using_perspective(adjusted_image, False)
+    gray = cv2.cvtColor(aligned_image, cv2.COLOR_BGR2GRAY)
+    binary_image = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 91, 5)
+    inverted_image = 255 - binary_image
+    return align_image_using_perspective(inverted_image, True)
 
-        # Calculate the perspective transformation matrix
-        matrix = cv2.getPerspectiveTransform(sorted_corners.astype(np.float32), dst_points)
+# Load and Preprocess Image
+def load_and_preprocess_image(image_path):
+    image = cv2.imread(image_path)
+    if image is None:
+        raise FileNotFoundError(f"Error: Unable to read image at {image_path}")
+    aligned_image = align_image_using_perspective(image, False)
+    inverted_image = enhance_and_invert_image(aligned_image)
+    return inverted_image
 
-        # Apply the perspective transformation to the image
-        warped_img = cv2.warpPerspective(img, matrix, (img.shape[1], img.shape[0]))
-        return warped_img
-    
-def invert_image(img):
-    clone =img
-    adjusted_img = cv2.addWeighted(img, alpha, np.zeros(img.shape, img.dtype), 0, beta)
-    # cf.show_images([adjusted_img])
-    img=perspective_transform(adjusted_img,0)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    thresh_image = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY,91, 5)
-    thresh_image=255-thresh_image
-    trial = perspective_transform(thresh_image,1)
-    # cf.show_images([thresh_image])
-    transform=perspective_transform(thresh_image,1)
-    return transform
-
-
-''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-arr=[[] for _ in range (6)]
-def readImage(imgpath):
-    img = cv2.imread(imgpath)
-    if img is None:
-        print(f"Error: Unable to read image at {imgpath}")
-        return None
-    transformed_img = perspective_transform(img, 0)
-    inverted_img = invert_image(transformed_img)
-    show_images([inverted_img])
-    return inverted_img
-
-def getVerticalLines(inverted_img):
-    # Check for invalid input
-    if inverted_img is None:
-        print("Error: Input image is None.")
-        return []
-    
-    # Edge detection
-    edges = cv2.Canny(inverted_img, 50, 150, apertureSize=3)
-    cv2.imshow("Edges Detected", edges)  # Debugging step: visualize edges
-    cv2.waitKey(0)  # Press a key to continue
-    
-    # Line detection
-    lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 180, threshold=260,
-                            minLineLength=160, maxLineGap=20)
-    
-    # Handle the case where no lines are detected
+# Detect Vertical Lines
+def detect_vertical_lines(image):
+    edges = cv2.Canny(image, 50, 150, apertureSize=3)
+    lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 180, threshold=260, minLineLength=160, maxLineGap=20)
     if lines is None:
-        print("Error: No lines detected.")
-        return []
-    
-    # Sort lines based on x-coordinate
+        raise ValueError("Error: No lines detected.")
     sorted_lines = sorted(lines, key=lambda line: line[0][0])
-    print("Detected and sorted vertical lines:", sorted_lines)
-    
-    # Filter lines to avoid duplicates
     filtered_lines = [sorted_lines[0]]
     for line in sorted_lines[1:]:
-        prev_x = filtered_lines[-1][0][0]
-        cur_x = line[0][0]
-        if cur_x - prev_x >= 20:
+        if line[0][0] - filtered_lines[-1][0][0] >= 20:
             filtered_lines.append(line)
-    
     return filtered_lines
 
-
-def getBlocks(lines,segments,inverted_img):
-    x1=lines[0][0][0]
-    idx=0
+# Function to extract individual blocks
+arr=[[] for _ in range (6)]
+def extract_blocks(lines, segment_info, binary_img):
+    start_x = lines[0][0][0]
+    line_index = 0
     for line in lines:
-        x2=line[0][0]
-        if(x2-x1>segments[0]):
-            block = inverted_img[0:4000, x1:x2]
-            break      
-        idx=idx+1
-    y1 = 150
-    while y1 < block.shape[0]:
-        cell = block[y1:y1 + 200, :]
+        end_x = line[0][0]
+        if (end_x - start_x > segment_info[0]):  # Width exceeds threshold
+            block = binary_img[0:4000, start_x:end_x]
+            break
+        line_index += 1
+
+    row_start = 150
+    while row_start < block.shape[0]:
+        cell = block[row_start:row_start + 200, :]  # Extract individual cells
         show_images([cell])
-        arr[segments[1]].append(cell)
-        y1 += 220
-    return [block,idx]
+        arr[segment_info[1]].append(cell)  # Append to segment-specific array
+        row_start += 220
 
-
-    
+    return [block, line_index]
