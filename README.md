@@ -89,26 +89,12 @@ The system was tested on:
 
 ---
 
-## Contributors
-- **[Your Name]**: Preprocessing, OCR implementation
-- **[Team Member 2]**: SVM training and testing
-- **[Team Member 3]**: DNN implementation and analysis
-- **[Team Member 4]**: Integration and debugging
-- **[Team Member 5]**: Report and documentation
-
----
-
 ## References
 - [Tesseract OCR](https://github.com/tesseract-ocr/tesseract)
 - [OpenCV Documentation](https://opencv.org/)
 - [LeNet-5](http://yann.lecun.com/exdb/lenet/)
 - [Scikit-learn](https://scikit-learn.org/)
 - [PyTorch Documentation](https://pytorch.org/)
-
----
-
-## License
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ---
 
