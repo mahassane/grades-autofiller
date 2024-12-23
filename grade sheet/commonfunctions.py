@@ -76,6 +76,8 @@ def invert_image(image):
         print("Error: No image provided for inversion")
         return None
 "''''''''''''''''''''''''''''''''''''''''''''''''''''''''"
+# Functions for image pre processing
+
 # Enhanced Perspective Transformation
 def align_image_using_perspective(image, is_binary=False):
     if image is None:
@@ -159,40 +161,6 @@ def extract_blocks(lines, segment_info, binary_img):
     return [block, line_index]
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-# To load extracted cells
-def load_extracted_cells(output_dir, num_images, num_rows_per_image):
-    extracted_cells = {}
-
-    for image_idx in range(1, num_images + 1):  # Iterate through folder indices 1 to num_images
-        folder_path = os.path.join(output_dir, str(image_idx))
-        
-        if not os.path.exists(folder_path):
-            print(f"Warning: Folder {folder_path} does not exist. Skipping...")
-            continue
-
-        cells = []
-        for row_idx in range(1, num_rows_per_image + 1):  # Iterate through row indices 1 to num_rows_per_image
-            # Construct the file path for the cell
-            cell_filename = f"Row1__{row_idx}.jpg"
-            cell_path = os.path.join(folder_path, cell_filename)
-
-            # Load the image
-            if os.path.exists(cell_path):  # Ensure the file exists
-                cell_img = cv2.imread(cell_path, cv2.IMREAD_GRAYSCALE)  # Load as grayscale
-                if cell_img is not None:
-                    # Extract label from filename (assuming the label is part of the filename, e.g., 'Row1__1.jpg' -> label 1)
-                    label = str(row_idx)  # Assuming the row number is the label
-                    cells.append((cell_img, label))  # Append image and label tuple
-                else:
-                    print(f"Warning: Unable to load {cell_path}.")
-            else:
-                print(f"Warning: File {cell_path} not found.")
-        
-        # Store cells for the current folder
-        extracted_cells[image_idx] = cells
-    
-    return extracted_cells
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 
 
